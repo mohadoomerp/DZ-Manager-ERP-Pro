@@ -1,0 +1,8 @@
+{
+  "name": "DZ-Manager ERP Pro",
+  "description": "Système de gestion intégré complet (ERP) avec Intelligence Artificielle Gemini spécialisée pour le marché Algérien.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

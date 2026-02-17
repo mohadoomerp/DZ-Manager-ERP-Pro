@@ -1,0 +1,24 @@
+
+{
+  "name": "DZ-Manager ERP Pro",
+  "short_name": "DZ-ERP",
+  "description": "Système de gestion intégré complet pour le marché Algérien.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2991/2991201.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2991/2991201.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

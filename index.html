@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DZ-Manager ERP - Algérie</title>
+    
+    <!-- Meta tags PWA -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DZ-ERP">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2991/2991201.png">
+
+    <!-- Google Identity Services SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        .transition-theme {
+          transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+        
+        /* --- قواعد الطباعة الصارمة --- */
+        @media print {
+            /* 1. إخفاء كل شيء افتراضياً */
+            body * {
+                visibility: hidden;
+            }
+
+            /* 2. إظهار منطقة الطباعة المحددة فقط */
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+
+            /* 3. تنسيق منطقة الطباعة لتأخذ كامل الصفحة */
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background-color: white;
+            }
+
+            /* 4. إلغاء تنسيقات التطبيق التي تمنع التمرير */
+            html, body, #root {
+                height: auto !important;
+                overflow: visible !important;
+                background-color: white !important;
+            }
+
+            /* 5. إخفاء العناصر غير المرغوب فيها صراحة */
+            .no-print, header, aside, .sidebar, .fixed {
+                display: none !important;
+            }
+
+            /* 6. إعدادات الصفحة */
+            @page {
+                size: auto;
+                margin: 0mm;
+            }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "peerjs": "https://esm.sh/peerjs@1.5.2",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 transition-theme">
+    <div id="root"></div>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./service-worker.js')
+            .then(reg => console.log('Service Worker enregistré !'))
+            .catch(err => console.log('Erreur SW:', err));
+        });
+      }
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-installable'));
+      });
+    </script>
+</body>
+</html>
