@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Peer, { DataConnection } from 'peerjs';
 import { ModuleType, Partner, Product, Employee, Invoice, Transaction, Purchase, EventBooking, AttendanceRecord, User, LicenseInfo, SessionInfo, CompanySettings, Lead, GeneratedLicense, AuditLog, DailyClosing, Candidate, TimeClockLog, AppNotification } from './types';
@@ -312,17 +313,41 @@ const App: React.FC = () => {
           (conn as any).on('close', () => { if (license.networkRole === 'HUB') { connectionsRef.current = connectionsRef.current.filter(c => c.peer !== conn.peer); setActiveSessions(prev => prev.filter(s => s.sessionId !== conn.peer)); } });
         });
         (peer as any).on('error', (err: any) => {
-          if (['peer-unavailable', 'network', 'disconnected', 'socket-error', 'socket-closed'].includes(err.type)) {
-             setNetworkStatus('disconnected');
-             if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-             retryTimeoutRef.current = setTimeout(() => { if (peerRef.current) { try { peerRef.current.reconnect(); } catch(e){} } }, 5000);
+          console.warn("PeerJS Error:", err.type);
+
+          // Cas spécifique : ID Hub introuvable (Hub éteint ou pas encore prêt)
+          if (err.type === 'peer-unavailable') {
+             if (license.networkRole === 'WORKSTATION') {
+                 // On reste connecté au serveur, mais on réessaie de joindre le Hub
+                 setNetworkStatus('retrying'); 
+                 if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+                 retryTimeoutRef.current = setTimeout(connectToHub, 5000);
+             }
              return;
           }
+
+          if (['network', 'disconnected', 'socket-error', 'socket-closed', 'server-error'].includes(err.type)) {
+             setNetworkStatus('disconnected');
+             if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+             retryTimeoutRef.current = setTimeout(() => { 
+                 if (peerRef.current && !peerRef.current.destroyed) { 
+                     try { peerRef.current.reconnect(); } catch(e) { initNetwork(); } 
+                 } else {
+                     initNetwork();
+                 }
+             }, 5000);
+             return;
+          }
+
           isInitializing.current = false; 
+          
           if (err.type === 'unavailable-id') {
               setNetworkStatus('retrying');
               if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-              retryTimeoutRef.current = setTimeout(() => { if (peerRef.current) { try { peerRef.current.destroy(); } catch(e){} peerRef.current = null; } initNetwork(); }, 3000); 
+              retryTimeoutRef.current = setTimeout(() => { 
+                  if (peerRef.current) { try { peerRef.current.destroy(); } catch(e){} peerRef.current = null; } 
+                  initNetwork(); 
+              }, 3000); 
           } 
         });
         (peer as any).on('disconnected', () => { if (peer && !peer.destroyed) { setNetworkStatus('retrying'); try { peer.reconnect(); } catch(e) {} } else { setNetworkStatus('disconnected'); } });
