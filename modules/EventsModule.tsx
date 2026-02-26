@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Plus, CalendarDays, Clock, X, Trash2, Edit3, ArrowRight,
   LayoutDashboard, Users, Grid3X3, Map, Briefcase, Wallet, Receipt,
-  UserCheck, LayoutTemplate, Palette, ScanLine, Smartphone
+  UserCheck, LayoutTemplate, Palette, ScanLine, Smartphone, Search, Funnel
 } from 'lucide-react';
 import { formatCurrency } from '../constants';
 import { EventBooking, Partner, Product, Invoice, ModuleType, User, CompanySettings, Transaction, AuditLog, Pavilion } from '../types';
@@ -39,6 +39,21 @@ interface EventsModuleProps {
 
 const DEFAULT_HALL: Pavilion = { id: 'default', name: 'Hall Principal', type: 'Hall', width: 30, depth: 20, x: 20, y: 20 };
 
+const EVENT_STATUS_OPTIONS: Array<{ value: EventBooking['status'] | 'all'; label: string }> = [
+  { value: 'all', label: 'Tous les statuts' },
+  { value: 'Confirmed', label: 'Confirmé' },
+  { value: 'In Progress', label: 'En cours' },
+  { value: 'Completed', label: 'Terminé' },
+  { value: 'Cancelled', label: 'Annulé' }
+];
+
+const EVENT_STATUS_BADGE_STYLES: Record<EventBooking['status'], string> = {
+  Confirmed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+  'In Progress': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300',
+  Completed: 'bg-slate-200 text-slate-700 dark:bg-slate-600/30 dark:text-slate-200',
+  Cancelled: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+};
+
 const TABS = [
   { id: 'dashboard', label: "Dashboard", icon: <LayoutDashboard size={16} /> },
   { id: 'scanner', label: 'Scanner Mobile', icon: <Smartphone size={16} /> },
@@ -63,6 +78,8 @@ const EventsModule: React.FC<EventsModuleProps> = ({
   const [selectedStandId, setSelectedStandId] = useState<string | null>(null);
   const [selectedUtilitySpaceId, setSelectedUtilitySpaceId] = useState<string | null>(null);
   const [activePavilionId, setActivePavilionId] = useState<string>('default');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<EventBooking['status'] | 'all'>('all');
 
   const visibleEvents = useMemo(() => {
     let filtered = events.filter(e => !e.isDeleted);
@@ -75,6 +92,19 @@ const EventsModule: React.FC<EventsModuleProps> = ({
   const activeEvent = useMemo(() => 
     visibleEvents.find(e => e.id === selectedEventId) || null
   , [visibleEvents, selectedEventId]);
+
+  const filteredEvents = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return visibleEvents
+      .filter(event => statusFilter === 'all' || event.status === statusFilter)
+      .filter(event => {
+        if (!normalizedSearch) return true;
+        const values = [event.title, event.id, event.theme || '', event.startDate, event.endDate];
+        return values.some(value => value.toLowerCase().includes(normalizedSearch));
+      })
+      .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  }, [visibleEvents, statusFilter, searchTerm]);
 
   const getAbbreviation = (title: string) => {
     if (!title) return "EVT";
@@ -181,7 +211,47 @@ const EventsModule: React.FC<EventsModuleProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {visibleEvents.map(event => (
+        <div className="md:col-span-2 lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-5 md:p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label className="md:col-span-2 relative">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Rechercher par nom, ID ou date..."
+                className="w-full h-12 pl-11 pr-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </label>
+
+            <label className="relative">
+              <Funnel size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as EventBooking['status'] | 'all')}
+                className="w-full h-12 pl-11 pr-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              >
+                {EVENT_STATUS_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Résultats</span>
+            <span className="px-3 py-1 rounded-full text-xs font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">{filteredEvents.length} dossier(s)</span>
+          </div>
+        </div>
+
+        {filteredEvents.length === 0 && (
+          <div className="md:col-span-2 lg:col-span-3 bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-[32px] p-10 text-center">
+            <CalendarDays size={28} className="mx-auto text-slate-300 mb-3" />
+            <h3 className="text-sm font-black uppercase tracking-wide text-slate-700 dark:text-slate-200">Aucun événement trouvé</h3>
+            <p className="text-xs mt-2 text-slate-500">Essayez un autre statut ou modifiez votre recherche.</p>
+          </div>
+        )}
+
+        {filteredEvents.map(event => (
           <div key={event.id} onClick={() => { setSelectedEventId(event.id); setView('manage'); }} className="bg-white dark:bg-slate-900 rounded-[48px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden group hover:shadow-2xl transition-all duration-500 flex flex-col cursor-pointer hover:border-indigo-500 relative">
             <div className="p-8 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start">
                <div className="flex items-center space-x-5 min-w-0">
@@ -191,6 +261,7 @@ const EventsModule: React.FC<EventsModuleProps> = ({
                   <div className="min-w-0">
                      <p className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter mb-0.5 truncate">{getAbbreviation(event.title)} • {event.id}</p>
                      <h3 className="font-black text-slate-900 dark:text-white text-base leading-tight uppercase truncate">{event.title}</h3>
+                     <span className={`inline-flex mt-2 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${EVENT_STATUS_BADGE_STYLES[event.status]}`}>{EVENT_STATUS_OPTIONS.find(option => option.value === event.status)?.label || event.status}</span>
                   </div>
                </div>
                <button onClick={(e) => handleDeleteEvent(e, event.id)} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-rose-300 hover:text-rose-600 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 shadow-sm shrink-0"><Trash2 size={18} /></button>

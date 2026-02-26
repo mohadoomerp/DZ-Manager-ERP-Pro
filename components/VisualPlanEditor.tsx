@@ -78,6 +78,7 @@ const VisualPlanEditor: React.FC<VisualPlanEditorProps> = ({
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [showPavilionModal, setShowPavilionModal] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
   
   // UI states
   const [showPositionMenu, setShowPositionMenu] = useState(false);
@@ -314,6 +315,96 @@ const VisualPlanEditor: React.FC<VisualPlanEditorProps> = ({
       }));
   }, [multiSelection, updateEntity]);
 
+  const findFreePosition = useCallback((
+    width: number,
+    depth: number,
+    pavilionId: string,
+    stands: Stand[],
+    utilities: UtilitySpace[],
+    pavilion: Pavilion
+  ) => {
+    const snapM = 0.5;
+    const stepX = (snapM / pavilion.width) * 100;
+    const stepY = (snapM / pavilion.depth) * 100;
+
+    for (let y = 0; y <= 100; y += stepY) {
+      for (let x = 0; x <= 100; x += stepX) {
+        if (!checkCollision('new', x, y, width, depth, 0, pavilionId, stands, utilities, pavilion)) {
+          return { x, y };
+        }
+      }
+    }
+
+    return { x: 0, y: 0 };
+  }, [checkCollision]);
+
+  const addStandQuick = useCallback((shape: 'rect' | 'L' = 'rect') => {
+    if (!currentPavilion) return;
+
+    updateEntity(ev => {
+      const standsInPav = ev.stands.filter(s => s.pavilionId === activePavilionId && s.x !== undefined);
+      const width = 3;
+      const depth = 3;
+      const position = findFreePosition(width, depth, activePavilionId, ev.stands, ev.utilitySpaces || [], currentPavilion);
+      const cutoutWidth = shape === 'L' ? 1 : undefined;
+      const cutoutDepth = shape === 'L' ? 1 : undefined;
+      const area = shape === 'L' ? (width * depth) - ((cutoutWidth || 0) * (cutoutDepth || 0)) : width * depth;
+
+      const stand: Stand = {
+        id: `ST-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        number: `S-${String(standsInPav.length + 1).padStart(3, '0')}`,
+        area,
+        pricePerSqm: 0,
+        type: 'amenage',
+        width,
+        depth,
+        shape,
+        cutoutWidth,
+        cutoutDepth,
+        pavilionId: activePavilionId,
+        x: position.x,
+        y: position.y,
+        color: '#ffffff',
+        rotation: 0
+      };
+
+      setSelectedStandId(stand.id);
+      setSelectedUtilitySpaceId(null);
+      setMultiSelection(new Set([stand.id]));
+
+      return { ...ev, stands: [...ev.stands, stand], updatedAt: Date.now() };
+    });
+  }, [activePavilionId, currentPavilion, findFreePosition, updateEntity, setSelectedStandId, setSelectedUtilitySpaceId]);
+
+  const addUtilityQuick = useCallback((type: UtilityType, label: string) => {
+    if (!currentPavilion) return;
+
+    updateEntity(ev => {
+      const width = 2;
+      const depth = 2;
+      const position = findFreePosition(width, depth, activePavilionId, ev.stands, ev.utilitySpaces || [], currentPavilion);
+
+      const utility: UtilitySpace = {
+        id: `UTIL-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        type,
+        label,
+        pavilionId: activePavilionId,
+        width,
+        depth,
+        x: position.x,
+        y: position.y,
+        color: '#f8fafc',
+        rotation: 0
+      };
+
+      setSelectedStandId(null);
+      setSelectedUtilitySpaceId(utility.id);
+      setMultiSelection(new Set([utility.id]));
+
+      return { ...ev, utilitySpaces: [...(ev.utilitySpaces || []), utility], updatedAt: Date.now() };
+    });
+  }, [activePavilionId, currentPavilion, findFreePosition, updateEntity, setSelectedStandId, setSelectedUtilitySpaceId]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         // Ignorer si on écrit dans un input
@@ -351,6 +442,29 @@ const VisualPlanEditor: React.FC<VisualPlanEditorProps> = ({
                  }));
              }
         }
+        else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+            e.preventDefault();
+            addStandQuick('L');
+        }
+        else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'R' || e.key === 'r')) {
+            e.preventDefault();
+            addStandQuick('rect');
+        }
+        else if (e.key === '+' || e.key === '=') {
+            e.preventDefault();
+            setTransform(t => ({ ...t, scale: Math.min(t.scale + 0.2, 4) }));
+        }
+        else if (e.key === '-') {
+            e.preventDefault();
+            setTransform(t => ({ ...t, scale: Math.max(t.scale - 0.2, 0.2) }));
+        }
+        else if (e.key === '0') {
+            e.preventDefault();
+            setTransform({ x: 0, y: 0, scale: 1 });
+        }
+        else if (e.code === 'Space') {
+            setIsSpacePressed(true);
+        }
         else if (multiSelection.size > 0 && currentPavilion) {
             // 1 flèche = 1 mètre (ou 0.1m si Shift maintenu pour précision)
             const meters = e.shiftKey ? 0.1 : 1; 
@@ -371,7 +485,16 @@ const VisualPlanEditor: React.FC<VisualPlanEditorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [multiSelection, isFullScreen, selectedElement, history, currentPavilion, undo, handleDeleteElement, handleDuplicateElement, updateEntity, setSelectedStandId, setSelectedUtilitySpaceId, setMultiSelection, setIsFullScreen, handleMoveElement, selectedStandId, selectedUtilitySpaceId]);
+  }, [multiSelection, isFullScreen, selectedElement, history, currentPavilion, undo, handleDeleteElement, handleDuplicateElement, updateEntity, setSelectedStandId, setSelectedUtilitySpaceId, setMultiSelection, setIsFullScreen, handleMoveElement, selectedStandId, selectedUtilitySpaceId, addStandQuick]);
+
+  useEffect(() => {
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpacePressed(false);
+    };
+
+    window.addEventListener('keyup', onKeyUp);
+    return () => window.removeEventListener('keyup', onKeyUp);
+  }, []);
 
 
   // ... (Drag Handler Logic) ...
@@ -803,12 +926,24 @@ const VisualPlanEditor: React.FC<VisualPlanEditorProps> = ({
                 <li className="flex justify-between"><span>Supprimer</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">Del</span></li>
                 <li className="flex justify-between"><span>Dupliquer</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">Ctrl+D</span></li>
                 <li className="flex justify-between"><span>Déplacer</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">Flèches</span></li>
+                <li className="flex justify-between"><span>Nouv. stand rect</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">Ctrl+Shift+R</span></li>
+                <li className="flex justify-between"><span>Nouv. stand L</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">Ctrl+Shift+L</span></li>
+                <li className="flex justify-between"><span>Zoom</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">+ / -</span></li>
+                <li className="flex justify-between"><span>Reset vue</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">0</span></li>
+                <li className="flex justify-between"><span>Pan souris</span> <span className="bg-white dark:bg-slate-900 px-1 rounded border">Espace + Drag</span></li>
             </ul>
          </div>
       </div>
 
       <div className="lg:col-span-3 bg-slate-200 dark:bg-black/40 rounded-[40px] border-4 border-slate-300 relative overflow-hidden flex flex-col print:border-none print:bg-white print:overflow-visible">
          {/* CANVA-STYLE TOP TOOLBAR */}
+         <div className="absolute top-3 left-3 z-30 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl p-2 flex flex-wrap gap-2 no-print">
+            <button onClick={() => addStandQuick('rect')} className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 flex items-center"><Box size={14} className="mr-2"/> Stand Rect</button>
+            <button onClick={() => addStandQuick('L')} className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 flex items-center"><LayoutTemplate size={14} className="mr-2"/> Stand L</button>
+            <button onClick={() => addUtilityQuick('porte', 'Porte')} className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 flex items-center"><DoorOpen size={14} className="mr-2"/> Porte</button>
+            <button onClick={() => addUtilityQuick('sanitaire', 'Sanitaire')} className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 flex items-center"><PersonStanding size={14} className="mr-2"/> Sanitaire</button>
+         </div>
+
          {selectedElement && (
             <div onMouseDown={(e) => e.stopPropagation()} className="absolute top-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between shadow-sm animate-in slide-in-from-top-2 no-print">
                 <div className="flex items-center space-x-4">
@@ -989,7 +1124,8 @@ const VisualPlanEditor: React.FC<VisualPlanEditorProps> = ({
             onWheel={handleWheel} 
             onClick={handleCanvasClick}
             onMouseDown={(e) => { 
-                if(e.button === 0 && !draggedStandId && !draggedPavilion && !draggedUtilitySpaceId) { 
+                if((e.button === 1 || isSpacePressed || (e.button === 0 && !draggedStandId && !draggedPavilion && !draggedUtilitySpaceId)) ) { 
+                    e.preventDefault();
                     setIsPanning(true); 
                     setPanStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
                     hasMovedRef.current = false;
